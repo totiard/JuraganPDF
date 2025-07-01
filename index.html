@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juragan PDF - Gabung, Pisah & Urutkan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PDF-LIB untuk manipulasi PDF -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <!-- PDF.js untuk rendering pratinjau -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+    <!-- JSZip untuk membuat file ZIP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Warna dasar biru tua */
+            /* Motif latar belakang abstrak dari SVG data URI */
+            background-image: 
+                radial-gradient(circle at top left, rgba(56, 189, 248, 0.1), transparent 40%),
+                radial-gradient(circle at bottom right, rgba(139, 92, 246, 0.1), transparent 40%),
+                url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%231e293b' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+        .file-input-label { cursor: pointer; border: 2px dashed #4a5568; padding: 2rem; transition: all 0.2s ease-in-out; }
+        .file-input-label:hover { border-color: #4299e1; background-color: #2d3748; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .preview-card { border: 1px solid #4a5568; transition: transform 0.2s ease-in-out, box-shadow 0.2s; cursor: grab; position: relative; }
+        .preview-card:active { cursor: grabbing; }
+        .preview-card.dragging { opacity: 0.5; transform: scale(1.05); box-shadow: 0 10px 20px rgba(0,0,0,0.4); }
+        .preview-card canvas { max-width: 120px; border: 1px solid #374151; border-radius: 4px; }
+        .delete-merge-btn { position: absolute; top: -10px; right: -10px; background-color: #ef4444; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 20px; line-height: 1; border: 2px solid #1e293b; cursor: pointer; transition: transform 0.2s; }
+        .delete-merge-btn:hover { transform: scale(1.1); }
+        .info-box { background-color: rgba(30, 41, 59, 0.5); border-left: 4px solid #3b82f6; padding: 0.75rem; font-style: italic; color: #cbd5e1; }
+        #split-preview-area { background-color: #1e293b; border-radius: 0.5rem; padding: 1.5rem; min-height: 300px; max-height: 70vh; overflow-y: auto; }
+        .preview-group { border: 1px solid #4b5563; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; }
+        .preview-group-title { font-semibold; margin-bottom: 0.75rem; color: #d1d5db; }
+        .preview-page-canvas { border: 1px solid #374151; border-radius: 0.25rem; max-width: 140px; }
+        .page-thumbnail { border: 2px solid #4a5568; transition: all 0.2s; cursor: pointer; position: relative; }
+        .page-thumbnail:hover { border-color: #60a5fa; }
+        .page-thumbnail.selected { border-color: #22c55e; box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.5); }
+        .page-thumbnail .checkmark { display: none; position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; background-color: #22c55e; border-radius: 50%; color: white; border: 2px solid #1e293b;}
+        .page-thumbnail.selected .checkmark { display: flex; align-items: center; justify-content: center; }
+    </style>
+</head>
+<body class="bg-slate-900 text-white flex flex-col min-h-screen p-4 sm:p-6 lg:p-8">
+
+    <main class="w-full flex-grow flex items-center justify-center">
+        <div class="w-full max-w-screen-xl">
+            <!-- Main Menu -->
+            <div id="main-menu" class="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 p-8 md:p-12 rounded-xl shadow-2xl text-center">
+                <h1 class="text-4xl md:text-5xl font-bold mb-3">Juragan PDF</h1>
+                <p class="text-gray-400 text-lg mb-10">Pilih operasi yang ingin Anda lakukan.</p>
+                <div class="flex flex-col md:flex-row gap-6 justify-center">
+                    <button id="btn-show-merge" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg transition duration-300 w-full md:w-auto flex items-center justify-center gap-3 text-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 1v4m0 0h-4m4 0l-5-5" /></svg>
+                        Gabungkan PDF
+                    </button>
+                    <button id="btn-show-split" class="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg transition duration-300 w-full md:w-auto flex items-center justify-center gap-3 text-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121M12 12l2.879-2.879M12 12L9.121 14.879" /></svg>
+                        Pisahkan PDF
+                    </button>
+                </div>
+            </div>
+
+            <!-- Merge Screen -->
+            <div id="merge-screen" class="hidden bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 p-8 rounded-xl shadow-2xl">
+                <button id="btn-back-merge" class="mb-6 text-blue-400 hover:text-blue-300">&larr; Kembali ke Menu</button>
+                <h2 class="text-3xl font-bold mb-4">Gabungkan File PDF</h2>
+                <p class="text-gray-400 mb-6">Pilih file, lalu seret untuk mengurutkan atau hapus file yang tidak diinginkan.</p>
+                <input type="file" id="merge-files-input" accept=".pdf" multiple class="hidden">
+                <label for="merge-files-input" id="merge-input-label" class="file-input-label flex flex-col items-center justify-center rounded-lg">Pilih File PDF</label>
+                <div id="merge-preview-container" class="mt-6 space-y-4"></div>
+                <button id="btn-add-more-files" class="hidden mt-4 w-full border-2 border-dashed border-gray-600 hover:border-blue-500 hover:bg-gray-700 text-gray-300 font-bold py-3 px-6 rounded-lg transition duration-300">+ Tambah File Lain</button>
+                <button id="merge-button" class="mt-8 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-lg">Gabungkan File</button>
+            </div>
+
+            <!-- Split Screen -->
+            <div id="split-screen" class="hidden bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 p-8 rounded-xl shadow-2xl">
+                <button id="btn-back-split" class="mb-6 text-blue-400 hover:text-blue-300">&larr; Kembali ke Menu</button>
+                <h2 class="text-3xl font-bold mb-4">Pisahkan File PDF</h2>
+                <div id="split-content-area" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Left Side: Preview Area -->
+                    <div class="lg:col-span-2">
+                        <div id="split-preview-area" class="flex flex-wrap gap-4 justify-center items-start">
+                            <p class="text-gray-500">Pratinjau akan muncul di sini setelah file dipilih.</p>
+                        </div>
+                    </div>
+                    <!-- Right Side: Controls -->
+                    <div class="lg:col-span-1">
+                        <!-- Step 1: File Upload -->
+                        <div id="split-step-1">
+                            <input type="file" id="split-file-input" accept=".pdf" class="hidden">
+                            <label for="split-file-input" class="file-input-label flex flex-col items-center justify-center rounded-lg mb-6">Pilih 1 File PDF</label>
+                        </div>
+                        <!-- Step 2 & 3: Options -->
+                        <div id="split-options-panel" class="hidden space-y-6">
+                            <div>
+                                <p class="text-gray-400">File <strong id="split-file-name" class="text-blue-300"></strong> (<span id="split-total-pages"></span> hal.)</p>
+                                <button id="btn-replace-split-file" class="text-sm text-red-400 hover:text-red-300 mt-1">Hapus & Ganti File</button>
+                            </div>
+                            <!-- Mode Selection -->
+                            <div class="flex gap-2 p-1 bg-gray-700 rounded-lg">
+                                <button id="btn-mode-range" class="flex-1 py-2 rounded-md transition">Rentang</button>
+                                <button id="btn-mode-page" class="flex-1 py-2 rounded-md transition">Halaman</button>
+                            </div>
+                            <!-- Range Mode Options -->
+                            <div id="split-range-options" class="hidden space-y-4">
+                                <div class="flex gap-2 p-1 bg-gray-900/50 rounded-lg">
+                                    <button id="btn-range-custom" class="flex-1 py-2 text-sm rounded-md transition">Rentang Khusus</button>
+                                    <button id="btn-range-fixed" class="flex-1 py-2 text-sm rounded-md transition">Rentang Tetap</button>
+                                </div>
+                                <div id="custom-range-ui" class="hidden p-4 bg-gray-900/50 rounded-lg space-y-3">
+                                    <div id="custom-range-container"></div>
+                                    <button id="btn-add-custom-range" class="text-sm text-blue-400 hover:text-blue-300">+ Tambah rentang</button>
+                                    <div class="flex items-center mt-3">
+                                        <input id="merge-ranges-checkbox" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 bg-gray-700">
+                                        <label for="merge-ranges-checkbox" class="ml-2 block text-sm text-gray-300">Gabungkan semua rentang</label>
+                                    </div>
+                                </div>
+                                <div id="fixed-range-ui" class="hidden p-4 bg-gray-900/50 rounded-lg">
+                                    <label for="fixed-range-input" class="block text-sm font-medium text-gray-300 mb-2">Pisahkan setiap:</label>
+                                    <input type="number" id="fixed-range-input" min="1" value="1" class="w-full bg-gray-800 border border-gray-600 rounded-md p-2 text-white">
+                                </div>
+                            </div>
+                            <!-- Page Mode Options -->
+                            <div id="split-page-options" class="hidden space-y-4">
+                                <div class="flex gap-2 p-1 bg-gray-900/50 rounded-lg">
+                                    <button id="btn-page-extract-all" class="flex-1 py-2 text-sm rounded-md transition">Ekstrak Semua</button>
+                                    <button id="btn-page-select" class="flex-1 py-2 text-sm rounded-md transition">Pilih Halaman</button>
+                                </div>
+                                <div id="select-pages-ui" class="hidden p-4 bg-gray-900/50 rounded-lg space-y-3">
+                                    <label for="select-pages-input" class="block text-sm font-medium text-gray-300">Pilih halaman (mis: 1, 5-8):</label>
+                                    <input type="text" id="select-pages-input" class="w-full bg-gray-800 border border-gray-600 rounded-md p-2 text-white">
+                                    <div class="flex items-center mt-3">
+                                        <input id="merge-extracted-checkbox" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 bg-gray-700">
+                                        <label for="merge-extracted-checkbox" class="ml-2 block text-sm text-gray-300">Gabungkan halaman terpilih</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="split-info-box" class="info-box hidden"></div>
+                            <button id="split-button" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-lg">Proses & Unduh</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="text-center py-4">
+        <p class="text-sm text-gray-500">Dibuat oleh <a href="https://totiard.github.io/Profile-New/" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline">Toti Ardiansyah</a></p>
+        <!-- Elemen untuk menampilkan penghitung -->
+        <div class="mt-2 text-sm text-gray-400 flex justify-center items-center gap-x-4">
+            <p id="viewer-counter">Pengunjung: Memuat...</p>
+            <span class="text-gray-600">|</span>
+            <p id="merge-counter">Digabung: Memuat...</p>
+            <span class="text-gray-600">|</span>
+            <p id="split-counter">Dipisah: Memuat...</p>
+        </div>
+    </footer>
+
+    <!-- Loading and Status Modal -->
+    <div id="status-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+        <div class="bg-gray-800 p-8 rounded-lg text-center shadow-xl">
+            <div id="loader" class="loader mx-auto"></div>
+            <p id="status-text" class="mt-4 text-lg font-medium">Sedang memproses...</p>
+        </div>
+    </div>
+
+    <script>
+        // --- START: Konfigurasi dan Inisialisasi Firebase ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDc_mN_58bHPn2HVSmfe6elJJqPfBUwgGw", // Ganti dengan API Key Anda
+            authDomain: "viewer-counter-871.firebaseapp.com",
+            projectId: "viewer-counter-871",
+            storageBucket: "viewer-counter-871.firebasestorage.app",
+            messagingSenderId: "71094703778",
+            appId: "1:71094703778:web:117fa4cd7e0d11a9a269fb",
+            measurementId: "G-K84HM64H68"
+        };
+
+        // Inisialisasi Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        // --- END: Konfigurasi dan Inisialisasi Firebase ---
+
+
+        window.addEventListener('DOMContentLoaded', () => {
+            // --- START: Logika Penghitung ---
+            const viewerCounterElement = document.getElementById('viewer-counter');
+            const mergeCounterElement = document.getElementById('merge-counter');
+            const splitCounterElement = document.getElementById('split-counter');
+
+            const viewerCounterRef = db.collection('counters').doc('page_views');
+            const mergeCounterRef = db.collection('counters').doc('merge_success');
+            const splitCounterRef = db.collection('counters').doc('split_success');
+
+            // Fungsi generik untuk menambah hitungan
+            const incrementCounter = async (counterRef) => {
+                try {
+                    await counterRef.update({
+                        count: firebase.firestore.FieldValue.increment(1)
+                    });
+                } catch (error) {
+                    if (error.code === 'not-found') {
+                        await counterRef.set({ count: 1 });
+                    } else {
+                        console.error("Error incrementing counter:", error);
+                    }
+                }
+            };
+            
+            // Fungsi generik untuk menampilkan hitungan
+            const displayCounter = (counterRef, element, prefix) => {
+                 counterRef.onSnapshot((doc) => {
+                    if (doc.exists) {
+                        element.textContent = `${prefix}: ${doc.data().count}`;
+                    } else {
+                        element.textContent = `${prefix}: 0`;
+                    }
+                }, (error) => {
+                    console.error("Error getting counter:", error);
+                    element.textContent = `${prefix}: Gagal memuat`;
+                });
+            };
+
+            // Panggil fungsi untuk setiap penghitung
+            incrementCounter(viewerCounterRef); // Tambah hitungan pengunjung saat halaman dimuat
+            displayCounter(viewerCounterRef, viewerCounterElement, 'Pengunjung');
+            displayCounter(mergeCounterRef, mergeCounterElement, 'Digabung');
+            displayCounter(splitCounterRef, splitCounterElement, 'Dipisah');
+            // --- END: Logika Penghitung ---
+
+
+            const { PDFDocument } = PDFLib;
+            const { pdfjsLib } = window;
+            
+            if (!pdfjsLib) {
+                console.error("PDF.js library not loaded!");
+                alert("Gagal memuat pustaka PDF. Silakan muat ulang halaman.");
+                return;
+            }
+            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js`;
+
+            // --- Global State ---
+            let mergeFiles = new Map();
+            let splitFile = { file: null, doc: null, totalPages: 0, pageCanvases: [] };
+            let splitMode = null, rangeMode = null, pageMode = null;
+
+            // --- UI Elements ---
+            const screens = { main: document.getElementById('main-menu'), merge: document.getElementById('merge-screen'), split: document.getElementById('split-screen') };
+            const statusModal = document.getElementById('status-modal'), statusText = document.getElementById('status-text'), loader = document.getElementById('loader');
+            const mergeFileInput = document.getElementById('merge-files-input'), mergeInputLabel = document.getElementById('merge-input-label'), addMoreFilesButton = document.getElementById('btn-add-more-files');
+            const splitStep1 = document.getElementById('split-step-1'), splitOptionsPanel = document.getElementById('split-options-panel');
+            const splitRangeOptions = document.getElementById('split-range-options'), splitPageOptions = document.getElementById('split-page-options');
+            const customRangeUI = document.getElementById('custom-range-ui'), fixedRangeUI = document.getElementById('fixed-range-ui'), selectPagesUI = document.getElementById('select-pages-ui');
+            const splitInfoBox = document.getElementById('split-info-box'), splitPreviewArea = document.getElementById('split-preview-area');
+            
+            // --- Function Declarations ---
+
+            function showScreen(screenKey) {
+                Object.values(screens).forEach(screen => screen.classList.add('hidden'));
+                screens[screenKey].classList.remove('hidden');
+            }
+            
+            function resetMergeUI() {
+                mergeFileInput.value = '';
+                document.getElementById('merge-preview-container').innerHTML = '';
+                mergeFiles.clear();
+                addMoreFilesButton.classList.add('hidden');
+                mergeInputLabel.classList.remove('hidden');
+            }
+            
+            function resetSplitUI() {
+                splitFile = { file: null, doc: null, totalPages: 0, pageCanvases: [] };
+                splitMode = rangeMode = pageMode = null;
+                document.getElementById('split-file-input').value = '';
+                splitStep1.classList.remove('hidden');
+                splitOptionsPanel.classList.add('hidden');
+                splitPreviewArea.innerHTML = '<p class="text-gray-500">Pratinjau akan muncul di sini setelah file dipilih.</p>';
+                splitInfoBox.classList.add('hidden');
+            }
+            
+            function showStatus(message, showLoader = true) {
+                statusText.textContent = message;
+                loader.style.display = showLoader ? 'block' : 'none';
+                statusModal.classList.remove('hidden');
+            }
+
+            function hideStatus() {
+                statusModal.classList.add('hidden');
+            }
+
+            // MERGE FUNCTIONS
+            async function handleMergeFileSelect(event) {
+                const newFiles = Array.from(event.target.files);
+                if (newFiles.length === 0) return;
+                showStatus('Memuat pratinjau...', true);
+                mergeInputLabel.classList.add('hidden');
+                addMoreFilesButton.classList.remove('hidden');
+
+                const container = document.getElementById('merge-preview-container');
+                
+                const renderPromises = newFiles.map(file => {
+                    return new Promise(async (resolve) => {
+                        const fileId = Date.now() + Math.random();
+                        mergeFiles.set(fileId, file);
+
+                        const card = document.createElement('div');
+                        card.className = 'preview-card bg-gray-700/50 p-3 rounded-lg flex items-center justify-between';
+                        card.draggable = true;
+                        card.dataset.fileId = fileId;
+
+                        const fileReader = new FileReader();
+                        fileReader.onload = async (e) => {
+                            const typedarray = new Uint8Array(e.target.result);
+                            try {
+                                const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+                                const page = await pdf.getPage(1);
+                                const viewport = page.getViewport({ scale: 0.5 });
+                                
+                                const canvas = document.createElement('canvas');
+                                const context = canvas.getContext('2d');
+                                canvas.height = viewport.height;
+                                canvas.width = viewport.width;
+                                await page.render({ canvasContext: context, viewport: viewport }).promise;
+
+                                const info = document.createElement('div');
+                                info.className = 'text-sm ml-4 flex-grow';
+                                info.innerHTML = `<p class="font-bold truncate">${file.name}</p><p class="text-gray-400">${pdf.numPages} halaman</p>`;
+                                
+                                const deleteBtn = document.createElement('button');
+                                deleteBtn.className = 'delete-merge-btn';
+                                deleteBtn.innerHTML = '&times;';
+                                deleteBtn.onclick = () => {
+                                    mergeFiles.delete(fileId);
+                                    card.remove();
+                                    if (mergeFiles.size === 0) {
+                                        addMoreFilesButton.classList.add('hidden');
+                                        mergeInputLabel.classList.remove('hidden');
+                                    }
+                                };
+
+                                card.appendChild(canvas);
+                                card.appendChild(info);
+                                card.appendChild(deleteBtn);
+                                container.appendChild(card);
+                            } catch (err) { 
+                                console.error("Gagal memproses file:", file.name, err); 
+                                mergeFiles.delete(fileId);
+                            } finally { 
+                                resolve(); 
+                            }
+                        };
+                        fileReader.readAsArrayBuffer(file);
+                    });
+                });
+                
+                await Promise.all(renderPromises);
+                setupDragAndDrop();
+                hideStatus();
+                event.target.value = '';
+            }
+            function setupDragAndDrop() {
+                const container = document.getElementById('merge-preview-container');
+                let draggingEle = null;
+                container.addEventListener('dragstart', (e) => {
+                    const targetCard = e.target.closest('.preview-card');
+                    if (targetCard) { draggingEle = targetCard; setTimeout(() => draggingEle.classList.add('dragging'), 0); }
+                });
+                container.addEventListener('dragend', () => { if (draggingEle) { draggingEle.classList.remove('dragging'); draggingEle = null; } });
+                container.addEventListener('dragover', e => {
+                    e.preventDefault();
+                    if (!draggingEle) return;
+                    const afterElement = getDragAfterElement(container, e.clientY);
+                    if (afterElement == null) { container.appendChild(draggingEle); } else { container.insertBefore(draggingEle, afterElement); }
+                });
+            }
+            function getDragAfterElement(container, y) {
+                const draggableElements = [...container.querySelectorAll('.preview-card:not(.dragging)')];
+                return draggableElements.reduce((closest, child) => {
+                    const box = child.getBoundingClientRect();
+                    const offset = y - box.top - box.height / 2;
+                    if (offset < 0 && offset > closest.offset) { return { offset: offset, element: child }; } else { return closest; }
+                }, { offset: Number.NEGATIVE_INFINITY }).element;
+            }
+            async function handleMerge() {
+                const container = document.getElementById('merge-preview-container');
+                const orderedCards = Array.from(container.querySelectorAll('.preview-card'));
+                if (orderedCards.length < 1) { alert('Pilih setidaknya satu file PDF.'); return; }
+                showStatus('Menggabungkan file...', true);
+                const mergedPdf = await PDFDocument.create();
+                try {
+                    const orderedFiles = orderedCards.map(card => mergeFiles.get(parseFloat(card.dataset.fileId)));
+                    for (const file of orderedFiles) {
+                        const arrayBuffer = await file.arrayBuffer();
+                        const pdf = await PDFDocument.load(arrayBuffer);
+                        const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+                        copiedPages.forEach(page => mergedPdf.addPage(page));
+                    }
+                    const pdfBytes = await mergedPdf.save();
+                    downloadPdf(pdfBytes, 'hasil-gabungan.pdf');
+                    incrementCounter(mergeCounterRef); // <-- TAMBAHKAN HITUNGAN DI SINI
+                    showStatus('File berhasil digabungkan!', false);
+                } catch (error) { console.error(error); showStatus('Terjadi kesalahan saat menggabungkan.', false); } finally { setTimeout(() => { hideStatus(); showScreen('main'); resetMergeUI(); }, 2000); }
+            }
+
+            // --- SPLIT FUNCTIONS ---
+            
+            async function handleSplitFileSelect(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                resetSplitUI();
+                showStatus('Membaca file PDF...', true);
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+                    
+                    splitFile = { file: file, doc: pdfDoc, totalPages: pdfDoc.numPages, pageCanvases: [] };
+                    
+                    showStatus('Membuat pratinjau halaman...', true);
+                    const promises = [];
+                    for (let i = 1; i <= splitFile.totalPages; i++) {
+                        const canvas = document.createElement('canvas');
+                        promises.push(renderPageToCanvas(i, canvas).then(() => {
+                            splitFile.pageCanvases[i-1] = canvas;
+                        }));
+                    }
+                    await Promise.all(promises);
+
+                    document.getElementById('split-file-name').textContent = file.name;
+                    document.getElementById('split-total-pages').textContent = splitFile.totalPages;
+                    splitStep1.classList.add('hidden');
+                    splitOptionsPanel.classList.remove('hidden');
+                    
+                    setSplitMode('range');
+                } catch (err) {
+                    console.error(err);
+                    alert('Gagal membaca file. Pastikan file PDF valid.');
+                    resetSplitUI();
+                } finally {
+                    hideStatus();
+                }
+            }
+
+            function setSplitMode(mode) {
+                splitMode = mode;
+                const btnRange = document.getElementById('btn-mode-range');
+                const btnPage = document.getElementById('btn-mode-page');
+                
+                if (mode === 'range') {
+                    btnRange.classList.add('bg-indigo-600'); btnRange.classList.remove('bg-gray-700');
+                    btnPage.classList.add('bg-gray-700'); btnPage.classList.remove('bg-purple-600');
+                    splitRangeOptions.classList.remove('hidden');
+                    splitPageOptions.classList.add('hidden');
+                    setRangeMode('custom');
+                } else {
+                    btnPage.classList.add('bg-purple-600'); btnPage.classList.remove('bg-gray-700');
+                    btnRange.classList.add('bg-gray-700'); btnRange.classList.remove('bg-indigo-600');
+                    splitPageOptions.classList.remove('hidden');
+                    splitRangeOptions.classList.add('hidden');
+                    setPageMode('all');
+                }
+            }
+
+            function setRangeMode(mode) {
+                rangeMode = mode;
+                pageMode = null;
+                const btnCustom = document.getElementById('btn-range-custom');
+                const btnFixed = document.getElementById('btn-range-fixed');
+                if (mode === 'custom') {
+                    btnCustom.classList.add('bg-indigo-500'); btnFixed.classList.remove('bg-indigo-500');
+                    customRangeUI.classList.remove('hidden');
+                    fixedRangeUI.classList.add('hidden');
+                    if (document.getElementById('custom-range-container').childElementCount === 0) {
+                        addCustomRangeInput(true); // Add first with default
+                    }
+                } else {
+                    btnFixed.classList.add('bg-indigo-500'); btnCustom.classList.remove('bg-indigo-500');
+                    fixedRangeUI.classList.remove('hidden');
+                    customRangeUI.classList.add('hidden');
+                }
+                updateSplitPreview();
+            }
+
+            function setPageMode(mode) {
+                pageMode = mode;
+                rangeMode = null;
+                const btnAll = document.getElementById('btn-page-extract-all');
+                const btnSelect = document.getElementById('btn-page-select');
+                if (mode === 'all') {
+                    btnAll.classList.add('bg-purple-500'); btnSelect.classList.remove('bg-purple-500');
+                    selectPagesUI.classList.add('hidden');
+                } else {
+                    btnSelect.classList.add('bg-purple-500'); btnAll.classList.remove('bg-purple-500');
+                    selectPagesUI.classList.remove('hidden');
+                }
+                updateSplitPreview();
+            }
+
+            function addCustomRangeInput(isFirst = false) {
+                const container = document.getElementById('custom-range-container');
+                const newRange = document.createElement('div');
+                newRange.className = 'flex items-center gap-2 custom-range-item';
+                const fromValue = isFirst ? 1 : '';
+                const toValue = isFirst ? splitFile.totalPages : '';
+                newRange.innerHTML = `
+                    <label class="text-sm">Dari:</label>
+                    <input type="number" min="1" max="${splitFile.totalPages}" value="${fromValue}" class="w-20 bg-gray-800 border border-gray-600 rounded-md p-1 text-white from-page">
+                    <label class="text-sm">Ke:</label>
+                    <input type="number" min="1" max="${splitFile.totalPages}" value="${toValue}" class="w-20 bg-gray-800 border border-gray-600 rounded-md p-1 text-white to-page">
+                    <button class="text-red-400 hover:text-red-300 delete-range-btn text-2xl leading-none">&times;</button>
+                `;
+                newRange.querySelector('.delete-range-btn').addEventListener('click', (e) => {
+                    e.currentTarget.parentElement.remove();
+                    updateSplitPreview();
+                });
+                container.appendChild(newRange);
+            }
+
+            async function renderPageToCanvas(pageNum, canvas) {
+                const page = await splitFile.doc.getPage(pageNum);
+                const viewport = page.getViewport({ scale: 0.4 });
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                const context = canvas.getContext('2d');
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+            }
+
+            function updateSplitInfo() {
+                let infoText = '';
+                if (splitMode === 'range' && rangeMode === 'fixed') {
+                    const rangeSize = parseInt(document.getElementById('fixed-range-input').value) || 1;
+                    if (rangeSize > 0 && splitFile.totalPages > 0) {
+                        const fileCount = Math.ceil(splitFile.totalPages / rangeSize);
+                        infoText = `PDF ini akan dibagi ke dalam rentang ${rangeSize} halaman. <strong>${fileCount}</strong> PDF akan dibuat.`;
+                    }
+                } else if (splitMode === 'range' && rangeMode === 'custom') {
+                    const mergeRanges = document.getElementById('merge-ranges-checkbox').checked;
+                    const rangeItems = document.querySelectorAll('.custom-range-item');
+                    let validRanges = 0;
+                    rangeItems.forEach(item => {
+                        const from = parseInt(item.querySelector('.from-page').value);
+                        const to = parseInt(item.querySelector('.to-page').value);
+                        if (from && to && from <= to && from <= splitFile.totalPages && to <= splitFile.totalPages) {
+                            validRanges++;
+                        }
+                    });
+                    if (validRanges > 0) {
+                        if (mergeRanges) {
+                            infoText = `Semua rentang yang valid akan digabungkan menjadi <strong>1</strong> file PDF.`;
+                        } else {
+                            infoText = `Setiap rentang akan disimpan sebagai file PDF terpisah. <strong>${validRanges}</strong> PDF akan dibuat.`;
+                        }
+                    }
+                } else if (splitMode === 'page') {
+                    const isMerged = document.getElementById('merge-extracted-checkbox').checked;
+                    if (pageMode === 'all') {
+                         infoText = `Semua halaman akan dikonversi ke dalam file PDF terpisah. <strong>${splitFile.totalPages}</strong> PDF akan dibuat.`;
+                    } else if (pageMode === 'select') {
+                        const pages = parsePageSelectionString(document.getElementById('select-pages-input').value, splitFile.totalPages);
+                        if (pages.length > 0) {
+                            if (isMerged) {
+                                infoText = `<strong>${pages.length}</strong> halaman yang dipilih akan digabungkan menjadi <strong>1</strong> file PDF.`;
+                            } else {
+                                infoText = `Halaman yang dipilih akan dikonversi ke dalam file PDF terpisah. <strong>${pages.length}</strong> PDF akan dibuat.`;
+                            }
+                        }
+                    }
+                }
+                
+                if (infoText) {
+                    splitInfoBox.innerHTML = infoText;
+                    splitInfoBox.classList.remove('hidden');
+                } else {
+                    splitInfoBox.classList.add('hidden');
+                }
+            }
+            
+            function updateSplitPreview() {
+                if (!splitFile.doc) return;
+                splitPreviewArea.innerHTML = '<div class="loader mx-auto"></div>';
+                
+                const fragment = document.createDocumentFragment();
+
+                if (splitMode === 'range') {
+                    if (rangeMode === 'fixed') {
+                        const rangeSize = parseInt(document.getElementById('fixed-range-input').value) || 1;
+                        if (rangeSize <= 0) { splitPreviewArea.innerHTML = ''; return; }
+                        for (let i = 0; i < splitFile.totalPages; i += rangeSize) {
+                            const group = document.createElement('div');
+                            group.className = 'preview-group';
+                            group.innerHTML = `<div class="preview-group-title">Rentang ${i + 1} - ${Math.min(i + rangeSize, splitFile.totalPages)}</div>`;
+                            const pageContainer = document.createElement('div');
+                            pageContainer.className = 'flex flex-wrap gap-2';
+                            
+                            const firstPageCanvas = splitFile.pageCanvases[i].cloneNode(true);
+                            firstPageCanvas.getContext('2d').drawImage(splitFile.pageCanvases[i], 0, 0);
+                            firstPageCanvas.classList.add('preview-page-canvas');
+                            pageContainer.appendChild(firstPageCanvas);
+
+                            if (rangeSize > 1 && i + 1 < splitFile.totalPages) {
+                                const ellipsis = document.createElement('span');
+                                ellipsis.className = 'self-center text-gray-400';
+                                ellipsis.textContent = '...';
+                                pageContainer.appendChild(ellipsis);
+
+                                const lastPageInRange = Math.min(i + rangeSize - 1, splitFile.totalPages - 1);
+                                if (lastPageInRange > i) {
+                                    const lastPageCanvas = splitFile.pageCanvases[lastPageInRange].cloneNode(true);
+                                    lastPageCanvas.getContext('2d').drawImage(splitFile.pageCanvases[lastPageInRange], 0, 0);
+                                    lastPageCanvas.classList.add('preview-page-canvas');
+                                    pageContainer.appendChild(lastPageCanvas);
+                                }
+                            }
+                            group.appendChild(pageContainer);
+                            fragment.appendChild(group);
+                        }
+                    } else if (rangeMode === 'custom') {
+                        const rangeItems = document.querySelectorAll('.custom-range-item');
+                        rangeItems.forEach((item, index) => {
+                            const from = parseInt(item.querySelector('.from-page').value);
+                            const to = parseInt(item.querySelector('.to-page').value);
+                            if (from && to && from <= to && from <= splitFile.totalPages && to <= splitFile.totalPages) {
+                                const group = document.createElement('div');
+                                group.className = 'preview-group';
+                                group.innerHTML = `<div class="preview-group-title">Rentang ${index + 1} (Hal ${from} - ${to})</div>`;
+                                const pageContainer = document.createElement('div');
+                                pageContainer.className = 'flex flex-wrap gap-2';
+                                
+                                const firstPageCanvas = splitFile.pageCanvases[from - 1].cloneNode(true);
+                                firstPageCanvas.getContext('2d').drawImage(splitFile.pageCanvases[from - 1], 0, 0);
+                                firstPageCanvas.classList.add('preview-page-canvas');
+                                pageContainer.appendChild(firstPageCanvas);
+
+                                if (to > from) {
+                                    const ellipsis = document.createElement('span');
+                                    ellipsis.className = 'self-center text-gray-400';
+                                    ellipsis.textContent = '...';
+                                    pageContainer.appendChild(ellipsis);
+
+                                    const lastPageCanvas = splitFile.pageCanvases[to - 1].cloneNode(true);
+                                    lastPageCanvas.getContext('2d').drawImage(splitFile.pageCanvases[to - 1], 0, 0);
+                                    lastPageCanvas.classList.add('preview-page-canvas');
+                                    pageContainer.appendChild(lastPageCanvas);
+                                }
+                                group.appendChild(pageContainer);
+                                fragment.appendChild(group);
+                            }
+                        });
+                    }
+                } else if (splitMode === 'page') {
+                    const selectedPages = new Set(parsePageSelectionString(document.getElementById('select-pages-input').value, splitFile.totalPages).map(p => p + 1));
+                    splitFile.pageCanvases.forEach((canvas, index) => {
+                        const pageNum = index + 1;
+                        const thumbnail = document.createElement('div');
+                        thumbnail.className = 'page-thumbnail';
+                        if (pageMode === 'select' && selectedPages.has(pageNum)) {
+                            thumbnail.classList.add('selected');
+                        }
+                        thumbnail.dataset.pageNum = pageNum;
+                        
+                        const clonedCanvas = canvas.cloneNode(true);
+                        clonedCanvas.getContext('2d').drawImage(canvas, 0, 0);
+                        thumbnail.appendChild(clonedCanvas);
+                        
+                        const checkmark = document.createElement('div');
+                        checkmark.className = 'checkmark';
+                        checkmark.innerHTML = '✓';
+                        thumbnail.appendChild(checkmark);
+                        
+                        if (pageMode === 'select') {
+                            thumbnail.addEventListener('click', () => {
+                                thumbnail.classList.toggle('selected');
+                                const currentlySelected = Array.from(document.querySelectorAll('.page-thumbnail.selected')).map(t => t.dataset.pageNum);
+                                document.getElementById('select-pages-input').value = currentlySelected.join(', ');
+                                updateSplitInfo();
+                            });
+                        }
+                        fragment.appendChild(thumbnail);
+                    });
+                }
+
+                splitPreviewArea.innerHTML = '';
+                splitPreviewArea.appendChild(fragment);
+                updateSplitInfo();
+            }
+
+            function parsePageSelectionString(input, maxPages) {
+                const pages = new Set();
+                if (!input) return [];
+                const parts = input.split(',');
+                for (const part of parts) {
+                    if (part.includes('-')) {
+                        const [start, end] = part.split('-').map(num => parseInt(num.trim()));
+                        if (!isNaN(start) && !isNaN(end) && start <= end) {
+                            for (let i = start; i <= end; i++) {
+                                if (i > 0 && i <= maxPages) pages.add(i - 1);
+                            }
+                        }
+                    } else {
+                        const page = parseInt(part.trim());
+                        if (!isNaN(page) && page > 0 && page <= maxPages) pages.add(page - 1);
+                    }
+                }
+                return Array.from(pages).sort((a, b) => a - b);
+            }
+
+            async function handleSplit() {
+                if (!splitFile.file) { alert('Pilih file PDF terlebih dahulu.'); return; }
+                showStatus('Mempersiapkan pemisahan...', true);
+                
+                const arrayBuffer = await splitFile.file.arrayBuffer();
+                const originalPdf = await PDFDocument.load(arrayBuffer);
+                const pdfsToZip = [];
+                const baseFileName = splitFile.file.name.replace(/\.pdf$/i, '');
+
+                try {
+                    if (splitMode === 'range') {
+                        const mergeRanges = document.getElementById('merge-ranges-checkbox').checked;
+                        let ranges = [];
+                        if (rangeMode === 'fixed') {
+                            const rangeSize = parseInt(document.getElementById('fixed-range-input').value) || 1;
+                            for (let i = 0; i < splitFile.totalPages; i += rangeSize) {
+                                ranges.push(Array.from({length: Math.min(rangeSize, splitFile.totalPages - i)}, (_, k) => i + k));
+                            }
+                        } else if (rangeMode === 'custom') {
+                             const rangeItems = document.querySelectorAll('.custom-range-item');
+                             rangeItems.forEach(item => {
+                                const from = parseInt(item.querySelector('.from-page').value);
+                                const to = parseInt(item.querySelector('.to-page').value);
+                                if (from && to && from <= to && from <= splitFile.totalPages && to <= splitFile.totalPages) {
+                                    ranges.push(Array.from({length: to - from + 1}, (_, k) => from - 1 + k));
+                                }
+                             });
+                        }
+                        
+                        if (mergeRanges && ranges.length > 0) {
+                            const newPdf = await PDFDocument.create();
+                            const allIndices = ranges.flat();
+                            const copiedPages = await newPdf.copyPages(originalPdf, allIndices);
+                            copiedPages.forEach(p => newPdf.addPage(p));
+                            pdfsToZip.push({ name: `${baseFileName}_rentang_digabung.pdf`, bytes: await newPdf.save() });
+                        } else {
+                            for(const range of ranges) {
+                                if(range.length === 0) continue;
+                                const newPdf = await PDFDocument.create();
+                                const copiedPages = await newPdf.copyPages(originalPdf, range);
+                                copiedPages.forEach(p => newPdf.addPage(p));
+                                pdfsToZip.push({ name: `${baseFileName}_hal_${range[0]+1}-${range[range.length-1]+1}.pdf`, bytes: await newPdf.save() });
+                            }
+                        }
+                    } else if (splitMode === 'page') {
+                        const isMerged = document.getElementById('merge-extracted-checkbox').checked;
+                        const pageIndices = (pageMode === 'all')
+                            ? Array.from({length: splitFile.totalPages}, (_, i) => i)
+                            : parsePageSelectionString(document.getElementById('select-pages-input').value, splitFile.totalPages);
+
+                        if (isMerged && pageIndices.length > 0) {
+                            const newPdf = await PDFDocument.create();
+                            const copiedPages = await newPdf.copyPages(originalPdf, pageIndices);
+                            copiedPages.forEach(p => newPdf.addPage(p));
+                            pdfsToZip.push({ name: `${baseFileName}_diekstrak.pdf`, bytes: await newPdf.save() });
+                        } else {
+                            for (const index of pageIndices) {
+                                const newPdf = await PDFDocument.create();
+                                const [copiedPage] = await newPdf.copyPages(originalPdf, [index]);
+                                newPdf.addPage(copiedPage);
+                                pdfsToZip.push({ name: `${baseFileName}_halaman_${index + 1}.pdf`, bytes: await newPdf.save() });
+                            }
+                        }
+                    }
+                    
+                    if (pdfsToZip.length === 0) throw new Error("Tidak ada halaman yang valid untuk diproses.");
+                    await downloadResult(pdfsToZip, baseFileName);
+
+                } catch (error) {
+                    console.error(error);
+                    showStatus(error.message || 'Terjadi kesalahan saat memisahkan.', false);
+                    setTimeout(hideStatus, 3000);
+                }
+            }
+            
+            async function downloadResult(pdfArray, baseFileName) {
+                incrementCounter(splitCounterRef); // <-- TAMBAHKAN HITUNGAN DI SINI
+                if (pdfArray.length === 1) {
+                    showStatus('Mengunduh file...', false);
+                    downloadPdf(pdfArray[0].bytes, pdfArray[0].name);
+                } else {
+                    showStatus('Membuat file ZIP...', true);
+                    const zip = new JSZip();
+                    pdfArray.forEach(pdf => {
+                        zip.file(pdf.name, pdf.bytes);
+                    });
+                    const zipBlob = await zip.generateAsync({ type: "blob" });
+                    downloadBlob(zipBlob, `${baseFileName}_dipisah.zip`);
+                    showStatus('File ZIP berhasil dibuat!', false);
+                }
+                setTimeout(() => {
+                    hideStatus();
+                    showScreen('main');
+                    resetSplitUI();
+                    resetMergeUI();
+                }, 2000);
+            }
+
+            // --- UTILITY ---
+            function downloadPdf(uint8Array, fileName) {
+                const blob = new Blob([uint8Array], { type: 'application/pdf' });
+                downloadBlob(blob, fileName);
+            }
+            function downloadBlob(blob, fileName) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            // --- Initial Event Listener Setup ---
+            document.getElementById('btn-show-merge').addEventListener('click', () => {
+                if (mergeFiles.size === 0) resetMergeUI();
+                showScreen('merge');
+            });
+            document.getElementById('btn-show-split').addEventListener('click', () => {
+                if (!splitFile.file) resetSplitUI();
+                showScreen('split');
+            });
+            document.getElementById('btn-back-merge').addEventListener('click', () => showScreen('main'));
+            document.getElementById('btn-back-split').addEventListener('click', () => showScreen('main'));
+            document.getElementById('merge-button').addEventListener('click', handleMerge);
+            document.getElementById('split-button').addEventListener('click', handleSplit);
+            mergeFileInput.addEventListener('change', handleMergeFileSelect);
+            addMoreFilesButton.addEventListener('click', () => mergeFileInput.click());
+            document.getElementById('split-file-input').addEventListener('change', handleSplitFileSelect);
+            document.getElementById('btn-replace-split-file').addEventListener('click', resetSplitUI);
+            document.getElementById('btn-mode-range').addEventListener('click', () => setSplitMode('range'));
+            document.getElementById('btn-mode-page').addEventListener('click', () => setSplitMode('page'));
+            document.getElementById('btn-range-custom').addEventListener('click', () => setRangeMode('custom'));
+            document.getElementById('btn-range-fixed').addEventListener('click', () => setRangeMode('fixed'));
+            document.getElementById('btn-page-extract-all').addEventListener('click', () => setPageMode('all'));
+            document.getElementById('btn-page-select').addEventListener('click', () => setPageMode('select'));
+            document.getElementById('btn-add-custom-range').addEventListener('click', () => { addCustomRangeInput(); updateSplitPreview(); });
+            document.getElementById('merge-ranges-checkbox').addEventListener('change', updateSplitPreview);
+            document.getElementById('custom-range-container').addEventListener('input', updateSplitPreview);
+            document.getElementById('fixed-range-input').addEventListener('input', updateSplitPreview);
+            document.getElementById('select-pages-input').addEventListener('input', updateSplitPreview);
+            document.getElementById('merge-extracted-checkbox').addEventListener('change', updateSplitPreview);
+        });
+    </script>
+</body>
+</html>

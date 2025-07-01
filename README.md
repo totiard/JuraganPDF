@@ -4,7 +4,7 @@ Selamat datang di **Juragan PDF**, sebuah aplikasi web ringkas yang dirancang un
 
 Aplikasi ini juga dilengkapi penghitung aksi (pengunjung, jumlah penggabungan, dan pemisahan) secara real-time menggunakan Firebase Firestore untuk menunjukkan seberapa sering alat ini digunakan.
 
-**[Lihat Demo Langsung](https://totiard.github.io/Mini-Aplikasi-PDF/)** (Ganti dengan URL GitHub Pages Anda jika sudah di-hosting)
+**[Lihat Demo Langsung](https://totiard.github.io/JuraganPDF/)**
 
 ![Pratinjau Aplikasi Juragan PDF](https://placehold.co/800x450/0f172a/e0e7ff?text=Pratinjau+Juragan+PDF)
 
@@ -58,11 +58,11 @@ Anda tidak memerlukan server web untuk menjalankan aplikasi ini. Cukup ikuti lan
 
 1.  **Clone repositori ini:**
     ```bash
-    git clone [https://github.com/USERNAME/NAMA-REPOSITORI.git](https://github.com/USERNAME/NAMA-REPOSITORI.git)
+    git clone [https://github.com/totiard/JuraganPDF.git](https://github.com/totiard/JuraganPDF.git)
     ```
 2.  **Buka direktori proyek:**
     ```bash
-    cd NAMA-REPOSITORI
+    cd JuraganPDF
     ```
 3.  **Buka file `index.html`:**
     Cukup klik dua kali file `index.html` atau buka langsung melalui browser Anda.

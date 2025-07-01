@@ -6,7 +6,7 @@ Aplikasi ini juga dilengkapi penghitung aksi (pengunjung, jumlah penggabungan, d
 
 **[Lihat Demo Langsung](https://totiard.github.io/JuraganPDF/)**
 
-![Pratinjau Aplikasi Juragan PDF](https://placehold.co/800x450/0f172a/e0e7ff?text=Pratinjau+Juragan+PDF)
+![Pratinjau Aplikasi Juragan PDF](./preview.png)
 
 ---
 
@@ -58,7 +58,7 @@ Anda tidak memerlukan server web untuk menjalankan aplikasi ini. Cukup ikuti lan
 
 1.  **Clone repositori ini:**
     ```bash
-    git clone [https://github.com/totiard/JuraganPDF.git](https://github.com/totiard/JuraganPDF.git)
+    git clone https://github.com/totiard/JuraganPDF.git
     ```
 2.  **Buka direktori proyek:**
     ```bash

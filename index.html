@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id" data-theme="dark"> <!-- Default ke tema gelap -->
+<html lang="id" data-theme="system"> <!-- Default ke tema gelap -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -383,6 +383,8 @@
                 splitOptionsPanel.classList.add('hidden');
                 splitPreviewArea.innerHTML = `<p class="text-color-secondary">Pratinjau akan muncul di sini setelah file dipilih.</p>`;
                 splitInfoBox.classList.add('hidden');
+                // FIX: Clear previous custom ranges on reset
+                document.getElementById('custom-range-container').innerHTML = '';
             }
             
             function showStatus(message, showLoader = true) {

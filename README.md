@@ -12,7 +12,9 @@ Aplikasi ini juga dilengkapi penghitung aksi (pengunjung, jumlah penggabungan, d
 
 ## ✨ Fitur Utama
 
-Juragan PDF menawarkan dua fitur utama untuk kebutuhan PDF Anda:
+Juragan PDF menawarkan beberapa fitur utama untuk kebutuhan PDF Anda:
+
+* **Pengalih Tema**: Sesuaikan tampilan aplikasi dengan preferensi Anda. Pilih antara mode terang, mode gelap, atau biarkan mengikuti tema default perangkat Anda.
 
 ### 1. Gabungkan PDF (Merge PDF)
 Fitur ini memungkinkan Anda untuk menggabungkan beberapa file PDF menjadi satu dokumen tunggal.

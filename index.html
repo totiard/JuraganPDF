@@ -1,9 +1,12 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" data-theme="dark"> <!-- Default ke tema gelap -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Juragan PDF - Gabung, Pisah & Urutkan</title>
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill='%234299e1' d='M10 0h80a10 10 0 0110 10v80a10 10 0 01-10 10H10A10 10 0 010 90V10A10 10 0 0110 0z'/%3E%3Cpath fill='%23fff' d='M30 25h40v10H30zM30 45h40v10H30zM30 65h20v10H30z'/%3E%3C/svg%3E" type="image/svg+xml">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- PDF-LIB untuk manipulasi PDF -->
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
@@ -14,47 +17,118 @@
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: rgba(30, 41, 59, 0.5);
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --border-primary: #4a5568;
+            --border-hover: #4299e1;
+            --accent-blue: #3b82f6;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #f1f5f9;
+            --bg-secondary: #ffffff;
+            --bg-card: rgba(255, 255, 255, 0.8);
+            --text-primary: #1e293b;
+            --text-secondary: #475569;
+            --border-primary: #cbd5e1;
+            --border-hover: #3b82f6;
+        }
+
         body { 
             font-family: 'Inter', sans-serif;
-            background-color: #0f172a; /* Warna dasar biru tua */
-            /* Motif latar belakang abstrak dari SVG data URI */
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background-color 0.3s, color 0.3s;
             background-image: 
                 radial-gradient(circle at top left, rgba(56, 189, 248, 0.1), transparent 40%),
                 radial-gradient(circle at bottom right, rgba(139, 92, 246, 0.1), transparent 40%),
                 url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%231e293b' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
         }
-        .file-input-label { cursor: pointer; border: 2px dashed #4a5568; padding: 2rem; transition: all 0.2s ease-in-out; }
-        .file-input-label:hover { border-color: #4299e1; background-color: #2d3748; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        [data-theme="light"] body {
+            background-image: 
+                radial-gradient(circle at top left, rgba(56, 189, 248, 0.1), transparent 40%),
+                radial-gradient(circle at bottom right, rgba(139, 92, 246, 0.1), transparent 40%),
+                url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23e2e8f0' fill-opacity='0.4'%3E%3Cpath d='M50 50c0-5.523 4.477-10 10-10s10 4.477 10 10-4.477 10-10 10c-5.523 0-10-4.477-10-10zM10 10c0-5.523 4.477-10 10-10s10 4.477 10 10-4.477 10-10 10c-5.523 0-10-4.477-10-10z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+
+        .main-card { background-color: var(--bg-card); border: 1px solid var(--border-primary); }
+        .file-input-label { cursor: pointer; border: 2px dashed var(--border-primary); padding: 2rem; transition: all 0.2s ease-in-out; }
+        .file-input-label:hover { border-color: var(--border-hover); background-color: var(--bg-secondary); }
+        .loader { border: 4px solid #94a3b8; border-top: 4px solid var(--accent-blue); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .preview-card { border: 1px solid #4a5568; transition: transform 0.2s ease-in-out, box-shadow 0.2s; cursor: grab; position: relative; }
+        
+        /* Layout Baru untuk Gabung PDF */
+        #merge-preview-container { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; }
+        .preview-card { border: 1px solid var(--border-primary); transition: transform 0.2s, box-shadow 0.2s; cursor: grab; position: relative; background-color: var(--bg-secondary); width: 150px; display: flex; flex-direction: column; align-items: center; padding: 0.75rem; border-radius: 0.5rem; }
         .preview-card:active { cursor: grabbing; }
         .preview-card.dragging { opacity: 0.5; transform: scale(1.05); box-shadow: 0 10px 20px rgba(0,0,0,0.4); }
-        .preview-card canvas { max-width: 120px; border: 1px solid #374151; border-radius: 4px; }
-        .delete-merge-btn { position: absolute; top: -10px; right: -10px; background-color: #ef4444; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 20px; line-height: 1; border: 2px solid #1e293b; cursor: pointer; transition: transform 0.2s; }
+        .preview-card canvas { max-width: 120px; border: 1px solid var(--border-primary); border-radius: 4px; }
+        .preview-card .info { text-align: center; margin-top: 0.5rem; width: 100%; }
+        .preview-card .info p { word-break: break-all; }
+        .delete-merge-btn { position: absolute; top: -10px; right: -10px; background-color: var(--accent-red); color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 20px; line-height: 1; border: 2px solid var(--bg-primary); cursor: pointer; transition: transform 0.2s; }
         .delete-merge-btn:hover { transform: scale(1.1); }
-        .info-box { background-color: rgba(30, 41, 59, 0.5); border-left: 4px solid #3b82f6; padding: 0.75rem; font-style: italic; color: #cbd5e1; }
-        #split-preview-area { background-color: #1e293b; border-radius: 0.5rem; padding: 1.5rem; min-height: 300px; max-height: 70vh; overflow-y: auto; }
-        .preview-group { border: 1px solid #4b5563; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; }
-        .preview-group-title { font-semibold; margin-bottom: 0.75rem; color: #d1d5db; }
-        .preview-page-canvas { border: 1px solid #374151; border-radius: 0.25rem; max-width: 140px; }
-        .page-thumbnail { border: 2px solid #4a5568; transition: all 0.2s; cursor: pointer; position: relative; }
-        .page-thumbnail:hover { border-color: #60a5fa; }
-        .page-thumbnail.selected { border-color: #22c55e; box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.5); }
-        .page-thumbnail .checkmark { display: none; position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; background-color: #22c55e; border-radius: 50%; color: white; border: 2px solid #1e293b;}
+        
+        /* Pisah PDF */
+        .info-box { background-color: var(--bg-card); border-left: 4px solid var(--accent-blue); padding: 0.75rem; font-style: italic; color: var(--text-secondary); }
+        #split-preview-area { background-color: var(--bg-secondary); border-radius: 0.5rem; padding: 1.5rem; min-height: 300px; max-height: 70vh; overflow-y: auto; }
+        .preview-group { border: 1px solid var(--border-primary); border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; background-color: var(--bg-primary); }
+        .preview-group-title { font-semibold; margin-bottom: 0.75rem; color: var(--text-primary); }
+        .preview-page-container { display: flex; flex-direction: column; align-items: center; }
+        .preview-page-canvas { border: 1px solid var(--border-primary); border-radius: 0.25rem; max-width: 140px; }
+        .page-number-label { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem; }
+        .page-thumbnail { border: 2px solid var(--border-primary); transition: all 0.2s; cursor: pointer; position: relative; padding: 0.5rem; background-color: var(--bg-primary); border-radius: 0.5rem; }
+        .page-thumbnail:hover { border-color: var(--accent-blue); }
+        .page-thumbnail.selected { border-color: var(--accent-green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-green) 50%, transparent); }
+        .page-thumbnail .checkmark { display: none; position: absolute; top: -1px; right: -1px; width: 24px; height: 24px; background-color: var(--accent-green); border-radius: 0 0.25rem 0 50%; color: white; border: 2px solid var(--bg-primary);}
         .page-thumbnail.selected .checkmark { display: flex; align-items: center; justify-content: center; }
+        
+        /* Theme Toggle */
+        #theme-toggle { background-color: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 9999px; display: flex; padding: 0.25rem; }
+        #theme-toggle button { padding: 0.5rem; border-radius: 50%; transition: background-color 0.2s; }
+        #theme-toggle button.active { background-color: var(--accent-blue); color: white; }
+        #theme-toggle svg { width: 1.25rem; height: 1.25rem; }
+
+        /* General UI */
+        .text-color-primary { color: var(--text-primary); }
+        .text-color-secondary { color: var(--text-secondary); }
+        .bg-color-primary { background-color: var(--bg-primary); }
+        .bg-color-secondary { background-color: var(--bg-secondary); }
+        .border-color-primary { border-color: var(--border-primary); }
+        input, select { background-color: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 0.375rem; padding: 0.5rem; color: var(--text-primary); }
     </style>
 </head>
-<body class="bg-slate-900 text-white flex flex-col min-h-screen p-4 sm:p-6 lg:p-8">
+<body class="flex flex-col min-h-screen p-4 sm:p-6 lg:p-8">
 
-    <main class="w-full flex-grow flex items-center justify-center">
-        <div class="w-full max-w-screen-xl">
+    <main class="w-full flex-grow">
+        <div class="w-full max-w-screen-xl mx-auto">
+            <!-- Theme Toggle Container -->
+            <div class="flex justify-end mb-4">
+                <div id="theme-toggle">
+                    <button data-theme-value="light" title="Mode Terang">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" /></svg>
+                    </button>
+                    <button data-theme-value="dark" title="Mode Gelap">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" /></svg>
+                    </button>
+                    <button data-theme-value="system" title="Sesuai Sistem">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25z" /></svg>
+                    </button>
+                </div>
+            </div>
+
             <!-- Main Menu -->
-            <div id="main-menu" class="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 p-8 md:p-12 rounded-xl shadow-2xl text-center">
-                <h1 class="text-4xl md:text-5xl font-bold mb-3">Juragan PDF</h1>
-                <p class="text-gray-400 text-lg mb-10">Pilih operasi yang ingin Anda lakukan.</p>
+            <div id="main-menu" class="main-card backdrop-blur-sm p-8 md:p-12 rounded-xl shadow-2xl text-center">
+                <h1 class="text-4xl md:text-5xl font-bold mb-3 text-color-primary">Juragan PDF</h1>
+                <p class="text-lg mb-10 text-color-secondary">Pilih operasi yang ingin Anda lakukan.</p>
                 <div class="flex flex-col md:flex-row gap-6 justify-center">
                     <button id="btn-show-merge" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg transition duration-300 w-full md:w-auto flex items-center justify-center gap-3 text-lg">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 1v4m0 0h-4m4 0l-5-5" /></svg>
@@ -68,26 +142,26 @@
             </div>
 
             <!-- Merge Screen -->
-            <div id="merge-screen" class="hidden bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 p-8 rounded-xl shadow-2xl">
+            <div id="merge-screen" class="hidden main-card backdrop-blur-sm p-8 rounded-xl shadow-2xl">
                 <button id="btn-back-merge" class="mb-6 text-blue-400 hover:text-blue-300">&larr; Kembali ke Menu</button>
-                <h2 class="text-3xl font-bold mb-4">Gabungkan File PDF</h2>
-                <p class="text-gray-400 mb-6">Pilih file, lalu seret untuk mengurutkan atau hapus file yang tidak diinginkan.</p>
+                <h2 class="text-3xl font-bold mb-4 text-color-primary">Gabungkan File PDF</h2>
+                <p class="mb-6 text-color-secondary">Pilih file, lalu seret untuk mengurutkan atau hapus file yang tidak diinginkan.</p>
                 <input type="file" id="merge-files-input" accept=".pdf" multiple class="hidden">
-                <label for="merge-files-input" id="merge-input-label" class="file-input-label flex flex-col items-center justify-center rounded-lg">Pilih File PDF</label>
-                <div id="merge-preview-container" class="mt-6 space-y-4"></div>
+                <label for="merge-files-input" id="merge-input-label" class="file-input-label flex flex-col items-center justify-center rounded-lg text-color-secondary">Pilih File PDF</label>
+                <div id="merge-preview-container" class="mt-6"></div>
                 <button id="btn-add-more-files" class="hidden mt-4 w-full border-2 border-dashed border-gray-600 hover:border-blue-500 hover:bg-gray-700 text-gray-300 font-bold py-3 px-6 rounded-lg transition duration-300">+ Tambah File Lain</button>
                 <button id="merge-button" class="mt-8 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-lg">Gabungkan File</button>
             </div>
 
             <!-- Split Screen -->
-            <div id="split-screen" class="hidden bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 p-8 rounded-xl shadow-2xl">
+            <div id="split-screen" class="hidden main-card backdrop-blur-sm p-8 rounded-xl shadow-2xl">
                 <button id="btn-back-split" class="mb-6 text-blue-400 hover:text-blue-300">&larr; Kembali ke Menu</button>
-                <h2 class="text-3xl font-bold mb-4">Pisahkan File PDF</h2>
+                <h2 class="text-3xl font-bold mb-4 text-color-primary">Pisahkan File PDF</h2>
                 <div id="split-content-area" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <!-- Left Side: Preview Area -->
                     <div class="lg:col-span-2">
                         <div id="split-preview-area" class="flex flex-wrap gap-4 justify-center items-start">
-                            <p class="text-gray-500">Pratinjau akan muncul di sini setelah file dipilih.</p>
+                            <p class="text-color-secondary">Pratinjau akan muncul di sini setelah file dipilih.</p>
                         </div>
                     </div>
                     <!-- Right Side: Controls -->
@@ -95,50 +169,51 @@
                         <!-- Step 1: File Upload -->
                         <div id="split-step-1">
                             <input type="file" id="split-file-input" accept=".pdf" class="hidden">
-                            <label for="split-file-input" class="file-input-label flex flex-col items-center justify-center rounded-lg mb-6">Pilih 1 File PDF</label>
+                            <label for="split-file-input" class="file-input-label flex flex-col items-center justify-center rounded-lg mb-6 text-color-secondary">Pilih 1 File PDF</label>
                         </div>
                         <!-- Step 2 & 3: Options -->
                         <div id="split-options-panel" class="hidden space-y-6">
                             <div>
-                                <p class="text-gray-400">File <strong id="split-file-name" class="text-blue-300"></strong> (<span id="split-total-pages"></span> hal.)</p>
+                                <p class="text-color-secondary">File <strong id="split-file-name" class="text-blue-300"></strong> (<span id="split-total-pages"></span> hal.)</p>
                                 <button id="btn-replace-split-file" class="text-sm text-red-400 hover:text-red-300 mt-1">Hapus & Ganti File</button>
                             </div>
                             <!-- Mode Selection -->
-                            <div class="flex gap-2 p-1 bg-gray-700 rounded-lg">
+                            <div class="flex gap-2 p-1 bg-color-primary rounded-lg">
                                 <button id="btn-mode-range" class="flex-1 py-2 rounded-md transition">Rentang</button>
                                 <button id="btn-mode-page" class="flex-1 py-2 rounded-md transition">Halaman</button>
                             </div>
                             <!-- Range Mode Options -->
                             <div id="split-range-options" class="hidden space-y-4">
-                                <div class="flex gap-2 p-1 bg-gray-900/50 rounded-lg">
+                                <div class="flex gap-2 p-1 bg-color-secondary rounded-lg">
                                     <button id="btn-range-custom" class="flex-1 py-2 text-sm rounded-md transition">Rentang Khusus</button>
                                     <button id="btn-range-fixed" class="flex-1 py-2 text-sm rounded-md transition">Rentang Tetap</button>
                                 </div>
-                                <div id="custom-range-ui" class="hidden p-4 bg-gray-900/50 rounded-lg space-y-3">
+                                <div id="custom-range-ui" class="hidden p-4 bg-color-secondary rounded-lg space-y-3">
                                     <div id="custom-range-container"></div>
                                     <button id="btn-add-custom-range" class="text-sm text-blue-400 hover:text-blue-300">+ Tambah rentang</button>
                                     <div class="flex items-center mt-3">
                                         <input id="merge-ranges-checkbox" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 bg-gray-700">
-                                        <label for="merge-ranges-checkbox" class="ml-2 block text-sm text-gray-300">Gabungkan semua rentang</label>
+                                        <label for="merge-ranges-checkbox" class="ml-2 block text-sm text-color-secondary">Gabungkan semua rentang</label>
                                     </div>
                                 </div>
-                                <div id="fixed-range-ui" class="hidden p-4 bg-gray-900/50 rounded-lg">
-                                    <label for="fixed-range-input" class="block text-sm font-medium text-gray-300 mb-2">Pisahkan setiap:</label>
-                                    <input type="number" id="fixed-range-input" min="1" value="1" class="w-full bg-gray-800 border border-gray-600 rounded-md p-2 text-white">
+                                <div id="fixed-range-ui" class="hidden p-4 bg-color-secondary rounded-lg">
+                                    <label for="fixed-range-input" class="block text-sm font-medium text-color-secondary mb-2">Pisahkan setiap:</label>
+                                    <input type="number" id="fixed-range-input" min="1" value="1" class="w-full text-center">
                                 </div>
                             </div>
                             <!-- Page Mode Options -->
                             <div id="split-page-options" class="hidden space-y-4">
-                                <div class="flex gap-2 p-1 bg-gray-900/50 rounded-lg">
+                                <div class="flex gap-2 p-1 bg-color-secondary rounded-lg">
                                     <button id="btn-page-extract-all" class="flex-1 py-2 text-sm rounded-md transition">Ekstrak Semua</button>
                                     <button id="btn-page-select" class="flex-1 py-2 text-sm rounded-md transition">Pilih Halaman</button>
                                 </div>
-                                <div id="select-pages-ui" class="hidden p-4 bg-gray-900/50 rounded-lg space-y-3">
-                                    <label for="select-pages-input" class="block text-sm font-medium text-gray-300">Pilih halaman (mis: 1, 5-8):</label>
-                                    <input type="text" id="select-pages-input" class="w-full bg-gray-800 border border-gray-600 rounded-md p-2 text-white">
+                                <div id="select-pages-ui" class="hidden p-4 bg-color-secondary rounded-lg space-y-3">
+                                    <p id="select-pages-hint" class="text-xs text-color-secondary italic hidden">Tips: Klik pada pratinjau halaman untuk memilih atau membatalkan pilihan.</p>
+                                    <label for="select-pages-input" class="block text-sm font-medium text-color-secondary">Pilih halaman (mis: 1, 5-8):</label>
+                                    <input type="text" id="select-pages-input" class="w-full pl-3">
                                     <div class="flex items-center mt-3">
                                         <input id="merge-extracted-checkbox" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 bg-gray-700">
-                                        <label for="merge-extracted-checkbox" class="ml-2 block text-sm text-gray-300">Gabungkan halaman terpilih</label>
+                                        <label for="merge-extracted-checkbox" class="ml-2 block text-sm text-color-secondary">Gabungkan halaman terpilih</label>
                                     </div>
                                 </div>
                             </div>
@@ -151,10 +226,10 @@
         </div>
     </main>
 
-    <footer class="text-center py-4">
-        <p class="text-sm text-gray-500">Dibuat oleh <a href="https://totiard.github.io/Profile-New/" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline">Toti Ardiansyah</a></p>
+    <footer class="text-center py-4 mt-auto">
+        <p class="text-sm text-color-secondary">Dibuat oleh <a href="https://totiard.github.io/Profile-New/" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline">Toti Ardiansyah</a></p>
         <!-- Elemen untuk menampilkan penghitung -->
-        <div class="mt-2 text-sm text-gray-400 flex justify-center items-center gap-x-4">
+        <div class="mt-2 text-sm text-color-secondary flex justify-center items-center gap-x-4">
             <p id="viewer-counter">Pengunjung: Memuat...</p>
             <span class="text-gray-600">|</span>
             <p id="merge-counter">Digabung: Memuat...</p>
@@ -162,7 +237,7 @@
             <p id="split-counter">Dipisah: Memuat...</p>
         </div>
     </footer>
-
+    
     <!-- Loading and Status Modal -->
     <div id="status-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
         <div class="bg-gray-800 p-8 rounded-lg text-center shadow-xl">
@@ -190,6 +265,42 @@
 
 
         window.addEventListener('DOMContentLoaded', () => {
+            // --- START: Logika Tema ---
+            const themeToggle = document.getElementById('theme-toggle');
+            const toggleButtons = themeToggle.querySelectorAll('button');
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+            function applyTheme(theme) {
+                const html = document.documentElement;
+                let effectiveTheme = theme;
+                if (theme === 'system') {
+                    effectiveTheme = systemPrefersDark.matches ? 'dark' : 'light';
+                }
+                html.setAttribute('data-theme', effectiveTheme);
+                
+                toggleButtons.forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.themeValue === theme);
+                });
+                localStorage.setItem('juragan-pdf-theme', theme);
+            }
+
+            toggleButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    applyTheme(button.dataset.themeValue);
+                });
+            });
+
+            systemPrefersDark.addEventListener('change', () => {
+                const currentTheme = localStorage.getItem('juragan-pdf-theme') || 'system';
+                if (currentTheme === 'system') {
+                    applyTheme('system');
+                }
+            });
+
+            const initialTheme = localStorage.getItem('juragan-pdf-theme') || 'system';
+            applyTheme(initialTheme);
+            // --- END: Logika Tema ---
+
             // --- START: Logika Penghitung ---
             const viewerCounterElement = document.getElementById('viewer-counter');
             const mergeCounterElement = document.getElementById('merge-counter');
@@ -199,37 +310,25 @@
             const mergeCounterRef = db.collection('counters').doc('merge_success');
             const splitCounterRef = db.collection('counters').doc('split_success');
 
-            // Fungsi generik untuk menambah hitungan
             const incrementCounter = async (counterRef) => {
                 try {
-                    await counterRef.update({
-                        count: firebase.firestore.FieldValue.increment(1)
-                    });
+                    await counterRef.update({ count: firebase.firestore.FieldValue.increment(1) });
                 } catch (error) {
-                    if (error.code === 'not-found') {
-                        await counterRef.set({ count: 1 });
-                    } else {
-                        console.error("Error incrementing counter:", error);
-                    }
+                    if (error.code === 'not-found') { await counterRef.set({ count: 1 }); } 
+                    else { console.error("Error incrementing counter:", error); }
                 }
             };
             
-            // Fungsi generik untuk menampilkan hitungan
             const displayCounter = (counterRef, element, prefix) => {
                  counterRef.onSnapshot((doc) => {
-                    if (doc.exists) {
-                        element.textContent = `${prefix}: ${doc.data().count}`;
-                    } else {
-                        element.textContent = `${prefix}: 0`;
-                    }
+                    element.textContent = `${prefix}: ${doc.exists ? doc.data().count : 0}`;
                 }, (error) => {
                     console.error("Error getting counter:", error);
-                    element.textContent = `${prefix}: Gagal memuat`;
+                    element.textContent = `${prefix}: Gagal`;
                 });
             };
 
-            // Panggil fungsi untuk setiap penghitung
-            incrementCounter(viewerCounterRef); // Tambah hitungan pengunjung saat halaman dimuat
+            incrementCounter(viewerCounterRef);
             displayCounter(viewerCounterRef, viewerCounterElement, 'Pengunjung');
             displayCounter(mergeCounterRef, mergeCounterElement, 'Digabung');
             displayCounter(splitCounterRef, splitCounterElement, 'Dipisah');
@@ -259,6 +358,7 @@
             const splitRangeOptions = document.getElementById('split-range-options'), splitPageOptions = document.getElementById('split-page-options');
             const customRangeUI = document.getElementById('custom-range-ui'), fixedRangeUI = document.getElementById('fixed-range-ui'), selectPagesUI = document.getElementById('select-pages-ui');
             const splitInfoBox = document.getElementById('split-info-box'), splitPreviewArea = document.getElementById('split-preview-area');
+            const selectPagesHint = document.getElementById('select-pages-hint');
             
             // --- Function Declarations ---
 
@@ -281,7 +381,7 @@
                 document.getElementById('split-file-input').value = '';
                 splitStep1.classList.remove('hidden');
                 splitOptionsPanel.classList.add('hidden');
-                splitPreviewArea.innerHTML = '<p class="text-gray-500">Pratinjau akan muncul di sini setelah file dipilih.</p>';
+                splitPreviewArea.innerHTML = `<p class="text-color-secondary">Pratinjau akan muncul di sini setelah file dipilih.</p>`;
                 splitInfoBox.classList.add('hidden');
             }
             
@@ -311,7 +411,7 @@
                         mergeFiles.set(fileId, file);
 
                         const card = document.createElement('div');
-                        card.className = 'preview-card bg-gray-700/50 p-3 rounded-lg flex items-center justify-between';
+                        card.className = 'preview-card';
                         card.draggable = true;
                         card.dataset.fileId = fileId;
 
@@ -330,8 +430,8 @@
                                 await page.render({ canvasContext: context, viewport: viewport }).promise;
 
                                 const info = document.createElement('div');
-                                info.className = 'text-sm ml-4 flex-grow';
-                                info.innerHTML = `<p class="font-bold truncate">${file.name}</p><p class="text-gray-400">${pdf.numPages} halaman</p>`;
+                                info.className = 'info text-sm text-color-secondary';
+                                info.innerHTML = `<p class="font-bold truncate text-color-primary">${file.name}</p><p>${pdf.numPages} halaman</p>`;
                                 
                                 const deleteBtn = document.createElement('button');
                                 deleteBtn.className = 'delete-merge-btn';
@@ -376,15 +476,15 @@
                 container.addEventListener('dragover', e => {
                     e.preventDefault();
                     if (!draggingEle) return;
-                    const afterElement = getDragAfterElement(container, e.clientY);
+                    const afterElement = getDragAfterElement(container, e.clientX);
                     if (afterElement == null) { container.appendChild(draggingEle); } else { container.insertBefore(draggingEle, afterElement); }
                 });
             }
-            function getDragAfterElement(container, y) {
+            function getDragAfterElement(container, x) {
                 const draggableElements = [...container.querySelectorAll('.preview-card:not(.dragging)')];
                 return draggableElements.reduce((closest, child) => {
                     const box = child.getBoundingClientRect();
-                    const offset = y - box.top - box.height / 2;
+                    const offset = x - box.left - box.width / 2;
                     if (offset < 0 && offset > closest.offset) { return { offset: offset, element: child }; } else { return closest; }
                 }, { offset: Number.NEGATIVE_INFINITY }).element;
             }
@@ -404,7 +504,7 @@
                     }
                     const pdfBytes = await mergedPdf.save();
                     downloadPdf(pdfBytes, 'hasil-gabungan.pdf');
-                    incrementCounter(mergeCounterRef); // <-- TAMBAHKAN HITUNGAN DI SINI
+                    incrementCounter(mergeCounterRef);
                     showStatus('File berhasil digabungkan!', false);
                 } catch (error) { console.error(error); showStatus('Terjadi kesalahan saat menggabungkan.', false); } finally { setTimeout(() => { hideStatus(); showScreen('main'); resetMergeUI(); }, 2000); }
             }
@@ -453,14 +553,15 @@
                 const btnPage = document.getElementById('btn-mode-page');
                 
                 if (mode === 'range') {
-                    btnRange.classList.add('bg-indigo-600'); btnRange.classList.remove('bg-gray-700');
-                    btnPage.classList.add('bg-gray-700'); btnPage.classList.remove('bg-purple-600');
+                    btnRange.classList.add('bg-indigo-600', 'text-white'); btnRange.classList.remove('bg-color-primary');
+                    btnPage.classList.remove('bg-purple-600', 'text-white'); btnPage.classList.add('bg-color-primary');
                     splitRangeOptions.classList.remove('hidden');
                     splitPageOptions.classList.add('hidden');
+                    selectPagesHint.classList.add('hidden');
                     setRangeMode('custom');
                 } else {
-                    btnPage.classList.add('bg-purple-600'); btnPage.classList.remove('bg-gray-700');
-                    btnRange.classList.add('bg-gray-700'); btnRange.classList.remove('bg-indigo-600');
+                    btnPage.classList.add('bg-purple-600', 'text-white'); btnPage.classList.remove('bg-color-primary');
+                    btnRange.classList.remove('bg-indigo-600', 'text-white'); btnRange.classList.add('bg-color-primary');
                     splitPageOptions.classList.remove('hidden');
                     splitRangeOptions.classList.add('hidden');
                     setPageMode('all');
@@ -473,14 +574,14 @@
                 const btnCustom = document.getElementById('btn-range-custom');
                 const btnFixed = document.getElementById('btn-range-fixed');
                 if (mode === 'custom') {
-                    btnCustom.classList.add('bg-indigo-500'); btnFixed.classList.remove('bg-indigo-500');
+                    btnCustom.classList.add('bg-indigo-500', 'text-white'); btnFixed.classList.remove('bg-indigo-500', 'text-white');
                     customRangeUI.classList.remove('hidden');
                     fixedRangeUI.classList.add('hidden');
                     if (document.getElementById('custom-range-container').childElementCount === 0) {
-                        addCustomRangeInput(true); // Add first with default
+                        addCustomRangeInput(true);
                     }
                 } else {
-                    btnFixed.classList.add('bg-indigo-500'); btnCustom.classList.remove('bg-indigo-500');
+                    btnFixed.classList.add('bg-indigo-500', 'text-white'); btnCustom.classList.remove('bg-indigo-500', 'text-white');
                     fixedRangeUI.classList.remove('hidden');
                     customRangeUI.classList.add('hidden');
                 }
@@ -493,11 +594,13 @@
                 const btnAll = document.getElementById('btn-page-extract-all');
                 const btnSelect = document.getElementById('btn-page-select');
                 if (mode === 'all') {
-                    btnAll.classList.add('bg-purple-500'); btnSelect.classList.remove('bg-purple-500');
+                    btnAll.classList.add('bg-purple-500', 'text-white'); btnSelect.classList.remove('bg-purple-500', 'text-white');
                     selectPagesUI.classList.add('hidden');
+                    selectPagesHint.classList.add('hidden');
                 } else {
-                    btnSelect.classList.add('bg-purple-500'); btnAll.classList.remove('bg-purple-500');
+                    btnSelect.classList.add('bg-purple-500', 'text-white'); btnAll.classList.remove('bg-purple-500', 'text-white');
                     selectPagesUI.classList.remove('hidden');
+                    selectPagesHint.classList.remove('hidden');
                 }
                 updateSplitPreview();
             }
@@ -510,9 +613,9 @@
                 const toValue = isFirst ? splitFile.totalPages : '';
                 newRange.innerHTML = `
                     <label class="text-sm">Dari:</label>
-                    <input type="number" min="1" max="${splitFile.totalPages}" value="${fromValue}" class="w-20 bg-gray-800 border border-gray-600 rounded-md p-1 text-white from-page">
+                    <input type="number" min="1" max="${splitFile.totalPages}" value="${fromValue}" class="w-24 text-center from-page">
                     <label class="text-sm">Ke:</label>
-                    <input type="number" min="1" max="${splitFile.totalPages}" value="${toValue}" class="w-20 bg-gray-800 border border-gray-600 rounded-md p-1 text-white to-page">
+                    <input type="number" min="1" max="${splitFile.totalPages}" value="${toValue}" class="w-24 text-center to-page">
                     <button class="text-red-400 hover:text-red-300 delete-range-btn text-2xl leading-none">&times;</button>
                 `;
                 newRange.querySelector('.delete-range-btn').addEventListener('click', (e) => {
@@ -530,7 +633,25 @@
                 const context = canvas.getContext('2d');
                 await page.render({ canvasContext: context, viewport: viewport }).promise;
             }
+            
+            function createPagePreviewElement(pageNum) {
+                const container = document.createElement('div');
+                container.className = 'preview-page-container';
 
+                const canvas = splitFile.pageCanvases[pageNum - 1].cloneNode(true);
+                canvas.getContext('2d').drawImage(splitFile.pageCanvases[pageNum - 1], 0, 0);
+                canvas.classList.add('preview-page-canvas');
+                
+                const label = document.createElement('span');
+                label.className = 'page-number-label';
+                label.textContent = `Hal. ${pageNum}`;
+                
+                container.appendChild(canvas);
+                container.appendChild(label);
+                return container;
+            }
+            
+            // BUG FIX: Define updateSplitInfo before it is called in updateSplitPreview
             function updateSplitInfo() {
                 let infoText = '';
                 if (splitMode === 'range' && rangeMode === 'fixed') {
@@ -580,7 +701,7 @@
                     splitInfoBox.classList.add('hidden');
                 }
             }
-            
+
             function updateSplitPreview() {
                 if (!splitFile.doc) return;
                 splitPreviewArea.innerHTML = '<div class="loader mx-auto"></div>';
@@ -596,25 +717,19 @@
                             group.className = 'preview-group';
                             group.innerHTML = `<div class="preview-group-title">Rentang ${i + 1} - ${Math.min(i + rangeSize, splitFile.totalPages)}</div>`;
                             const pageContainer = document.createElement('div');
-                            pageContainer.className = 'flex flex-wrap gap-2';
+                            pageContainer.className = 'flex flex-wrap gap-4 justify-center';
                             
-                            const firstPageCanvas = splitFile.pageCanvases[i].cloneNode(true);
-                            firstPageCanvas.getContext('2d').drawImage(splitFile.pageCanvases[i], 0, 0);
-                            firstPageCanvas.classList.add('preview-page-canvas');
-                            pageContainer.appendChild(firstPageCanvas);
+                            pageContainer.appendChild(createPagePreviewElement(i + 1));
 
                             if (rangeSize > 1 && i + 1 < splitFile.totalPages) {
                                 const ellipsis = document.createElement('span');
-                                ellipsis.className = 'self-center text-gray-400';
+                                ellipsis.className = 'self-center text-color-secondary';
                                 ellipsis.textContent = '...';
                                 pageContainer.appendChild(ellipsis);
 
-                                const lastPageInRange = Math.min(i + rangeSize - 1, splitFile.totalPages - 1);
-                                if (lastPageInRange > i) {
-                                    const lastPageCanvas = splitFile.pageCanvases[lastPageInRange].cloneNode(true);
-                                    lastPageCanvas.getContext('2d').drawImage(splitFile.pageCanvases[lastPageInRange], 0, 0);
-                                    lastPageCanvas.classList.add('preview-page-canvas');
-                                    pageContainer.appendChild(lastPageCanvas);
+                                const lastPageInRange = Math.min(i + rangeSize, splitFile.totalPages);
+                                if (lastPageInRange > i + 1) {
+                                    pageContainer.appendChild(createPagePreviewElement(lastPageInRange));
                                 }
                             }
                             group.appendChild(pageContainer);
@@ -630,23 +745,16 @@
                                 group.className = 'preview-group';
                                 group.innerHTML = `<div class="preview-group-title">Rentang ${index + 1} (Hal ${from} - ${to})</div>`;
                                 const pageContainer = document.createElement('div');
-                                pageContainer.className = 'flex flex-wrap gap-2';
+                                pageContainer.className = 'flex flex-wrap gap-4 justify-center';
                                 
-                                const firstPageCanvas = splitFile.pageCanvases[from - 1].cloneNode(true);
-                                firstPageCanvas.getContext('2d').drawImage(splitFile.pageCanvases[from - 1], 0, 0);
-                                firstPageCanvas.classList.add('preview-page-canvas');
-                                pageContainer.appendChild(firstPageCanvas);
+                                pageContainer.appendChild(createPagePreviewElement(from));
 
                                 if (to > from) {
                                     const ellipsis = document.createElement('span');
-                                    ellipsis.className = 'self-center text-gray-400';
+                                    ellipsis.className = 'self-center text-color-secondary';
                                     ellipsis.textContent = '...';
                                     pageContainer.appendChild(ellipsis);
-
-                                    const lastPageCanvas = splitFile.pageCanvases[to - 1].cloneNode(true);
-                                    lastPageCanvas.getContext('2d').drawImage(splitFile.pageCanvases[to - 1], 0, 0);
-                                    lastPageCanvas.classList.add('preview-page-canvas');
-                                    pageContainer.appendChild(lastPageCanvas);
+                                    pageContainer.appendChild(createPagePreviewElement(to));
                                 }
                                 group.appendChild(pageContainer);
                                 fragment.appendChild(group);
@@ -655,7 +763,7 @@
                     }
                 } else if (splitMode === 'page') {
                     const selectedPages = new Set(parsePageSelectionString(document.getElementById('select-pages-input').value, splitFile.totalPages).map(p => p + 1));
-                    splitFile.pageCanvases.forEach((canvas, index) => {
+                    splitFile.pageCanvases.forEach((_, index) => {
                         const pageNum = index + 1;
                         const thumbnail = document.createElement('div');
                         thumbnail.className = 'page-thumbnail';
@@ -664,9 +772,7 @@
                         }
                         thumbnail.dataset.pageNum = pageNum;
                         
-                        const clonedCanvas = canvas.cloneNode(true);
-                        clonedCanvas.getContext('2d').drawImage(canvas, 0, 0);
-                        thumbnail.appendChild(clonedCanvas);
+                        thumbnail.appendChild(createPagePreviewElement(pageNum));
                         
                         const checkmark = document.createElement('div');
                         checkmark.className = 'checkmark';
@@ -786,7 +892,7 @@
             }
             
             async function downloadResult(pdfArray, baseFileName) {
-                incrementCounter(splitCounterRef); // <-- TAMBAHKAN HITUNGAN DI SINI
+                incrementCounter(splitCounterRef);
                 if (pdfArray.length === 1) {
                     showStatus('Mengunduh file...', false);
                     downloadPdf(pdfArray[0].bytes, pdfArray[0].name);
